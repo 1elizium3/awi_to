@@ -1,18 +1,30 @@
-'use Strict';
+'use strict';
 // Сохраняю все объявления
 // Получаю данные из localStorage или массив(без него будет null)
 const dataBase = JSON.parse(localStorage.getItem('awito')) || [];   
+// Получаю уникальный id(без id при клике на элемент открывается другой элемент)
+let counter = dataBase.length;
 
-const modalAdd = document.querySelector('.modal__add'); // добавляю модальное окно
-const addAd = document.querySelector('.add__ad');   // Получаю кнопку
-const modalBtnSubmit = document.querySelector('.modal__btn-submit'); // Получаю Отправить
-const modalSubmit = document.querySelector('.modal__submit'); // Добавляю форму
+const modalAdd = document.querySelector('.modal__add'); 
+const addAd = document.querySelector('.add__ad');   
+const modalBtnSubmit = document.querySelector('.modal__btn-submit'); 
+const modalSubmit = document.querySelector('.modal__submit'); 
 const catalog = document.querySelector('.catalog');
 const modalItem = document.querySelector('.modal__item');
 const modalBtnWarning = document.querySelector('.modal__btn-warning');
 const modalFileInput = document.querySelector('.modal__file-input');
 const modalFileBtn = document.querySelector('.modal__file-btn');
 const modalImageAdd = document.querySelector('.modal__image-add');
+
+const modalImageItem = document.querySelector('.modal__image-item');
+const modalHeaderItem = document.querySelector('.modal__header-item');
+const modalStatusItem = document.querySelector('.modal__status-item');
+const modalDescriptionItem = document.querySelector('.modal__description-item');
+const modalCostItem = document.querySelector('.modal__cost-item');
+
+const searchInput = document.querySelector('.search__input');
+
+const menuContainer = document.querySelector('.menu__container');
 // Временная переменная для очистки span кнопки
 const textFileBtn = modalFileBtn.textContent; // Получаю текст
 const srcModalImage = modalImageAdd.src;      // Получаю данные их src
@@ -53,25 +65,37 @@ const closeModal = (e) => {
     modalImageAdd.src = srcModalImage;      // Очистка изображения
     modalFileBtn.textContent = textFileBtn; // Очистка текста кнопки
     checkForm();          // Очищаю форму 
-  } 
-  
+  }
 };
 // Вывожу карточки товара
-const renderCard = () => {
+const renderCard = (DB = dataBase) => {
   catalog.textContent = '';   // Очищаю каталог
   // Перебираю БД
-  dataBase.forEach((item, i) => {
+  DB.forEach((item) => {
     catalog.insertAdjacentHTML('beforeend', `
-      <li class="card" data-id="${i}">
+      <li class="card" data-id-item="${item.id}">
         <img class="card__image" src="data:image/jpeg;base64,${item.image}" alt="test">
         <div class="card__description">
           <h3 class="card__header">${item.nameItem}</h3>
-          <div class="card__price">${item.costItem}</div>
+          <div class="card__price">${item.costItem} $</div>
         </div>
       </li>
     `);
   });
 };
+// Поиск
+searchInput.addEventListener('input', (e) => {
+  // Убираю пробелы и пишу с маленькой буквы
+  const valueSearch = searchInput.value.trim().toLowerCase(); 
+  // Проверяю на кол-во введенных символов
+  if (valueSearch.length > 1) {
+    const result = dataBase
+      .filter(item => item.nameItem.toLowerCase().includes(valueSearch) ||
+              item.descriptionItem.toLowerCase().includes(valueSearch)); // Поиск подстроки в строке
+    renderCard(result); 
+  }
+});
+
 // Добавление фото
 // FileReader создаёт объект который помогает работать с файлом который получу после добавления
 modalFileInput.addEventListener('change', (e) => {
@@ -98,18 +122,19 @@ modalFileInput.addEventListener('change', (e) => {
       checkForm();              // Очищаю форму('Заполните все поля') 
     }
   });
-
 });
 // Отслеживаю действия в форме на заполненные поля
 modalSubmit.addEventListener('input', checkForm);
 // Сохраняю объявления
 modalSubmit.addEventListener('submit', (e) => {
   e.preventDefault();       // отменяю перезагрузку страницы
-  const itemObj = {};
+  const itemObj = {}; 
+
   for (const elem of elementsModalSubmit) {
     itemObj[elem.name] = elem.value;
     // console.log(elem.name); console.log(elem.value);
   }
+  itemObj.id = counter++;           // Формирую уникальный id
   itemObj.image = infoPhoto.base64; // Добавляю фото в БД
   dataBase.push(itemObj);
   closeModal({ target: modalAdd });   // Очищаю форму после Отправления
@@ -123,19 +148,38 @@ addAd.addEventListener('click', () => {
   modalBtnSubmit.disabled = true;     //  Блокирую кнопку
   document.addEventListener('keydown', closeModal);
 });
-
-modalAdd.addEventListener('click', closeModal);
-modalItem.addEventListener('click', closeModal);
 // Делегирование событий
-// Закрываю мод.окно Каталога
+// Действия с Каталогом. Вывожу введенные данные в мод.окно
 catalog.addEventListener('click', (e) => {
   const target = e.target;
-  if (target.closest('.card')) {
+  const card = target.closest('.card');
+
+  if (card) {
+    // + - конвертирую string в number
+    const item = dataBase.find((item) => item.id === +card.dataset.idItem); // Из БД достаю объекты
+    // console.log('item: ', item);
+    modalImageItem.src = `data:image/jpeg;base64,${item.image}`;  // Картинка
+    modalHeaderItem.textContent = item.nameItem;                  // Название
+    modalStatusItem.textContent = item.status === 'new' ? 'Новый' : 'Б/у'; // Состояния
+    modalDescriptionItem.textContent = item.descriptionItem;  // Описание
+    modalCostItem.textContent = item.costItem;  // Стоимость
     modalItem.classList.remove('hide');
-    // Навешиваю событие когда открылось модалюокно(чтобы оно все время не висело)
+   // Навешиваю событие когда открылось модал.окно(чтобы оно все время не висело)
     document.addEventListener('keydown', closeModal); 
   }
 });
+// Распределяю товар по группам
+menuContainer.addEventListener('click', (e) => {
+  const target = e.target;
+  // Проверяю по тегу а
+  if (target.tagName === 'A') {
+    const result = dataBase.filter((item) => item.category === target.dataset.category);
+    renderCard(result);
+  } 
+});
+
+modalAdd.addEventListener('click', closeModal);
+modalItem.addEventListener('click', closeModal);
 
 renderCard();
 
